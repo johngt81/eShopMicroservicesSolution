@@ -1,12 +1,8 @@
 ﻿using EventBus;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Catalog.API.IntegrationEvents
 {
-    public class ProductPriceChangedIntegrationEvent:IntegrationEvent
+    public class ProductPriceChangedIntegrationEvent : IntegrationEvent
     {
         private readonly int productId;
         private readonly decimal oldPrice;
