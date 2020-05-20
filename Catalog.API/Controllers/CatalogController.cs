@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Catalog.API.Infrastructure;
+using Catalog.API.IntegrationEvents;
 using Catalog.API.Model;
+using EventBus;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using RabbitMQ.Client;
 
 namespace Catalog.API.Controllers
 {
@@ -16,10 +19,12 @@ namespace Catalog.API.Controllers
     public class CatalogController : ControllerBase
     {
         private readonly CatalogContext catalogContext;
+        private readonly IEventBus eventBus;
 
-        public CatalogController(CatalogContext catalogContext)
+        public CatalogController(CatalogContext catalogContext, IEventBus eventBus)
         {
             this.catalogContext = catalogContext;
+            this.eventBus = eventBus;
         }
 
         // GET: api/Catalog
@@ -59,8 +64,8 @@ namespace Catalog.API.Controllers
 
             if (item.Price != catalogItem.Price)
             {
-                //Notify about price changed
-
+                this.eventBus.Publish(
+                    new ProductPriceChangedIntegrationEvent(catalogItem.Id,item.Price, catalogItem.Price));
             }
             //I had to manually map properties, assigning catalogItem did not work
             item.Name = catalogItem.Name;
