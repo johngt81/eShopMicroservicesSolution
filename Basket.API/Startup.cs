@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Autofac;
+using Autofac.Extensions.DependencyInjection;
 using Basket.API.Infraestructure;
 using Basket.API.IntegrationEvents;
 using Basket.API.Model;
@@ -33,9 +35,11 @@ namespace Basket.API
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            //services.AddAutofac();
             services.AddControllers();
             services.AddDbContext<BasketContext>();
             services.AddScoped<IBasketRepository, BasketRepository>();
+            services.AddSingleton<IEventBusSubscriptionsManager, InMemoryEventBusSubscriptionsManager>();
 
             services.AddSingleton<IRabbitConnection>(sp =>
             {
@@ -44,14 +48,23 @@ namespace Basket.API
 
                 return new RabbitConnection(factory, 3);
             });
+            var subscriptionClientName = "client";
+
             services.AddSingleton<IEventBus, EventBusRabbitMQ.EventBusRabbitMQ>(
                 sp =>
                 {
                     var rabbitConnection = sp.GetRequiredService<IRabbitConnection>();
-                    var eventBusSubscriptionManager = sp.GetRequiredService<IEventBusSubscriptionManager>();
-                    // sp.GetRequiredService<ILifeTimeScope>
-                    return new EventBusRabbitMQ.EventBusRabbitMQ(rabbitConnection, eventBusSubscriptionManager);
+                    var iLifetimeScope = sp.GetRequiredService<ILifetimeScope>();
+                    var eventBusSubscriptionManager = sp.GetRequiredService<IEventBusSubscriptionsManager>();
+                    return new EventBusRabbitMQ.EventBusRabbitMQ(rabbitConnection, iLifetimeScope, eventBusSubscriptionManager, subscriptionClientName, 3);
+
                 });
+
+
+            var container = new ContainerBuilder();
+            container.Populate(services);
+
+            var provider = new AutofacServiceProvider(container.Build());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -78,53 +91,40 @@ namespace Basket.API
 
         private void ConfigureEventBus(IApplicationBuilder app)
         {
-            //var eventBus = app.ApplicationServices.GetRequiredService<IEventBus>();
-            //eventBus.Subscribe<ProductPriceChangedIntegrationEvent, ProductPriceChangedIntegrationEventHandler>();
+            var eventBus = app.ApplicationServices.GetRequiredService<IEventBus>();
+            eventBus.Subscribe<ProductPriceChangedIntegrationEvent, ProductPriceChangedIntegrationEventHandler>();
 
-            var factory = new ConnectionFactory() { DispatchConsumersAsync = true };
-            factory.Uri = new Uri(@"amqp://kowlozas:NdwUKYQe0HIkDvjgDRYWCVOr_RU4bVa1@hornet.rmq.cloudamqp.com/kowlozas");
+            //var factory = new ConnectionFactory() { DispatchConsumersAsync = true };
+            //factory.Uri = new Uri(@"amqp://kowlozas:NdwUKYQe0HIkDvjgDRYWCVOr_RU4bVa1@hornet.rmq.cloudamqp.com/kowlozas");
 
-            using (var connection = factory.CreateConnection())
-            using (var channel = connection.CreateModel())
-            {
-                channel.QueueDeclare(queue: "ProductPriceChangedQueue",
-                    durable: true,
-                    exclusive: false,
-                    autoDelete: false,
-                    arguments: null);
+            //using (var connection = factory.CreateConnection())
+            //using (var channel = connection.CreateModel())
+            //{
+            //    channel.QueueDeclare(queue: "ProductPriceChangedQueue",
+            //        durable: true,
+            //        exclusive: false,
+            //        autoDelete: false,
+            //        arguments: null);
 
-                //channel.QueueBind(queue: "ProductPriceChangedQueue",
-                //    exchange: "demo_broker",
-                //    routingKey: "another");
+            //    var consumer = new AsyncEventingBasicConsumer(channel);
 
-                //channel.CallbackException += Channel_CallbackException;
-
-              //  var consumer = new EventingBasicConsumer(channel);
-              //var result =  channel.BasicGet("ProductPriceChangedQueue", true);
-              //  var message = System.Text.Encoding.UTF8.GetString(result.Body.ToArray());
-
-              //  var integrationEvent = JsonConvert.DeserializeObject<ProductPriceChangedIntegrationEvent>(message);
-
-                
-                var consumer = new AsyncEventingBasicConsumer(channel);
-                
-                consumer.Received += Consumer_Received;
-                channel.BasicConsume(
-                    queue: "ProductPriceChangedQueue",
-                    autoAck: false,
-                    consumer: consumer
-                    );
-            }
+            //    consumer.Received += Consumer_Received;
+            //    channel.BasicConsume(
+            //        queue: "ProductPriceChangedQueue",
+            //        autoAck: false,
+            //        consumer: consumer
+            //        );
+            //}
         }
 
-        private static async Task Consumer_Received(object sender, BasicDeliverEventArgs @event)
-        {
-            var eventName = @event.RoutingKey;
-            var message = System.Text.Encoding.UTF8.GetString(@event.Body.ToArray());
+        //private static async Task Consumer_Received(object sender, BasicDeliverEventArgs @event)
+        //{
+        //    var eventName = @event.RoutingKey;
+        //    var message = System.Text.Encoding.UTF8.GetString(@event.Body.ToArray());
 
-            var integrationEvent = JsonConvert.DeserializeObject<ProductPriceChangedIntegrationEvent>(message);
-            var handler = new ProductPriceChangedIntegrationEventHandler();
-            await handler.Handle(integrationEvent);
-        }
+        //    var integrationEvent = JsonConvert.DeserializeObject<ProductPriceChangedIntegrationEvent>(message);
+        //    var handler = new ProductPriceChangedIntegrationEventHandler();
+        //    await handler.Handle(integrationEvent);
+        //}
     }
 }

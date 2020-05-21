@@ -4,15 +4,15 @@ namespace Basket.API.IntegrationEvents
 {
     public class ProductPriceChangedIntegrationEvent : IntegrationEvent
     {
-        private readonly int productId;
-        private readonly decimal oldPrice;
-        private readonly decimal newPrice;
+        public  int ProductId { get; set; }
+        public decimal OldPrice { get; set; }
+        public decimal NewPrice { get; set; }
 
         public ProductPriceChangedIntegrationEvent(int productId, decimal oldPrice, decimal newPrice)
         {
-            this.productId = productId;
-            this.oldPrice = oldPrice;
-            this.newPrice = newPrice;
+            this.ProductId = productId;
+            this.OldPrice = oldPrice;
+            this.NewPrice = newPrice;
         }
     }
 }
